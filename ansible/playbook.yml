@@ -1,0 +1,104 @@
+- name: Provision game server
+  hosts: remote
+  tasks:
+    - name: Ensure SELinux is set to permissive mode
+      ansible.builtin.lineinfile:
+        path: /etc/selinux/config
+        regexp: '^SELINUX='
+        line: SELINUX=permissive
+      become: true
+    - name: Configure hostname
+      ansible.builtin.hostname:
+        name: game
+        use: systemd
+      become: true
+    - name: Add Tailscale repository
+      ansible.builtin.yum_repository:
+        name: tailscale-stable
+        description: Tailscale stable
+        baseurl: https://pkgs.tailscale.com/stable/fedora/$basearch
+        gpgkey: https://pkgs.tailscale.com/stable/fedora/repo.gpg
+      become: true
+    - name: Install Tailscale
+      ansible.builtin.dnf:
+        name: tailscale
+        state: present
+      become: true
+    - name: Enable and start Tailscale
+      ansible.builtin.systemd:
+        name: tailscaled
+        state: started
+        enabled: true
+      become: true
+    - name: Enable RPM Fusion
+      ansible.builtin.dnf:
+        name: https://mirrors.rpmfusion.org/free/fedora/rpmfusion-free-release-36.noarch.rpm
+        disable_gpg_check: true
+        state: present
+      become: true
+    - name: Enable RPM Fusion (nonfree)
+      ansible.builtin.dnf:
+        name: https://mirrors.rpmfusion.org/nonfree/fedora/rpmfusion-nonfree-release-36.noarch.rpm
+        disable_gpg_check: true
+        state: present
+      become: true
+    - name: Install steam (for dependencies)
+      ansible.builtin.dnf:
+        name: steam
+        state: present
+      become: true
+    - name: Add steam user
+      ansible.builtin.user:
+        name: steam
+        create_home: true
+      become: true
+    - name: Add Steam folder
+      ansible.builtin.file:
+        path: /home/steam/Steam
+        state: directory
+        mode: '0755'
+        owner: steam
+        group: steam
+      become: true
+    - name: Download and unpack steamcmd
+      ansible.builtin.unarchive:
+        src: https://steamcdn-a.akamaihd.net/client/installer/steamcmd_linux.tar.gz
+        dest: /home/steam/Steam
+        remote_src: true
+        owner: steam
+      become: true
+      become_user: steam
+    - name: Install Satisfactory server
+      ansible.builtin.command:
+        cmd: /home/steam/Steam/steamcmd.sh +force_install_dir /home/steam/SatisfactoryDedicatedServer +login anonymous +app_update 1690800 -beta public validate +quit
+      changed_when: true
+      become: true
+      become_user: steam
+    - name: Create systemd file for Satisfactory
+      ansible.builtin.copy:
+        dest: /etc/systemd/system/satisfactory.service
+        content: |
+          [Unit]
+          Description=Satisfactory dedicated server
+          Wants=network-online.target
+          After=syslog.target network.target nss-lookup.target network-online.target
+
+          [Service]
+          Environment="LD_LIBRARY_PATH=./linux64"
+          ExecStart=/home/steam/SatisfactoryDedicatedServer/FactoryServer.sh
+          User=steam
+          Group=steam
+          Restart=on-failure
+          WorkingDirectory=/home/steam/SatisfactoryDedicatedServer
+
+          [Install]
+          WantedBy=multi-user.target
+        mode: '0644'
+      become: true
+    - name: Enable and start Satisfactory server
+      ansible.builtin.systemd:
+        daemon_reload: true
+        name: satisfactory
+        state: started
+        enabled: true
+      become: true
