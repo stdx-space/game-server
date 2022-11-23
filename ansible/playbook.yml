@@ -32,13 +32,13 @@
       become: true
     - name: Enable RPM Fusion
       ansible.builtin.dnf:
-        name: https://mirrors.rpmfusion.org/free/fedora/rpmfusion-free-release-36.noarch.rpm
+        name: https://mirrors.rpmfusion.org/free/fedora/rpmfusion-free-release-37.noarch.rpm
         disable_gpg_check: true
         state: present
       become: true
     - name: Enable RPM Fusion (nonfree)
       ansible.builtin.dnf:
-        name: https://mirrors.rpmfusion.org/nonfree/fedora/rpmfusion-nonfree-release-36.noarch.rpm
+        name: https://mirrors.rpmfusion.org/nonfree/fedora/rpmfusion-nonfree-release-37.noarch.rpm
         disable_gpg_check: true
         state: present
       become: true
@@ -68,12 +68,12 @@
         owner: steam
       become: true
       become_user: steam
-    - name: Install Satisfactory server
-      ansible.builtin.command:
-        cmd: /home/steam/Steam/steamcmd.sh +force_install_dir /home/steam/SatisfactoryDedicatedServer +login anonymous +app_update 1690800 -beta public validate +quit
-      changed_when: true
-      become: true
-      become_user: steam
+    # - name: Install Satisfactory server
+    #   ansible.builtin.command:
+    #     cmd: /home/steam/Steam/steamcmd.sh +force_install_dir /home/steam/SatisfactoryDedicatedServer +login anonymous +app_update 1690800 -beta public validate +quit
+    #   changed_when: true
+    #   become: true
+    #   become_user: steam
     - name: Create systemd file for Satisfactory
       ansible.builtin.copy:
         dest: /etc/systemd/system/satisfactory.service
@@ -85,11 +85,13 @@
 
           [Service]
           Environment="LD_LIBRARY_PATH=./linux64"
+          ExecStartPre=/home/steam/Steam/steamcmd.sh +force_install_dir /home/steam/SatisfactoryDedicatedServer +login anonymous +app_update 1690800 -beta public validate +quit
           ExecStart=/home/steam/SatisfactoryDedicatedServer/FactoryServer.sh
           User=steam
           Group=steam
           Restart=on-failure
           WorkingDirectory=/home/steam/SatisfactoryDedicatedServer
+          TimeoutStartSec=300
 
           [Install]
           WantedBy=multi-user.target
